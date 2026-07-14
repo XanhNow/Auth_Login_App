@@ -1,0 +1,45 @@
+﻿# Build output
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+
+# IDE/local
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test/coverage
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+# Logs/temp/artifacts
+*.log
+*.tmp
+*.temp
+artifacts/*.log
+
+# Secrets/certs/local runtime
+.env
+.env.*
+appsettings.Local.json
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+role_id
+secret_id
+*_role_id
+*_secret_id
+*token*.txt
+*password*.txt

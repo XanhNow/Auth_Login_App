@@ -1,0 +1,12 @@
+﻿<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/XanhNow.Auth.Login.Api/XanhNow.Auth.Login.Api.csproj" />
+    <Project Path="src/XanhNow.Auth.Login.Application/XanhNow.Auth.Login.Application.csproj" />
+    <Project Path="src/XanhNow.Auth.Login.Domain/XanhNow.Auth.Login.Domain.csproj" />
+    <Project Path="src/XanhNow.Auth.Login.Infrastructure/XanhNow.Auth.Login.Infrastructure.csproj" />
+    <Project Path="src/XanhNow.Auth.Login.Migrator/XanhNow.Auth.Login.Migrator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/XanhNow.Auth.Login.Application.Tests/XanhNow.Auth.Login.Application.Tests.csproj" />
+  </Folder>
+</Solution>
