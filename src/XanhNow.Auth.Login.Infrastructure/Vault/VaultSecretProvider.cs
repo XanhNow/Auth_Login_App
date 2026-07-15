@@ -14,8 +14,11 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
 
     public VaultSecretProvider(HttpClient httpClient, VaultOptions options)
     {
-        this.httpClient = httpClient;
         this.options = options;
+        this.httpClient = string.IsNullOrWhiteSpace(FirstNonEmpty(options.CaCertFile, options.CaCertificatePath))
+            ? httpClient
+            : CreateHttpClient(options);
+        this.httpClient.BaseAddress = new Uri(options.Address.TrimEnd('/') + "/");
     }
 
     public async Task<PostgresSecret> ReadPostgresSecretAsync(CancellationToken cancellationToken)
@@ -86,11 +89,20 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
             return clientToken;
         }
 
-        var roleId = Environment.GetEnvironmentVariable(options.RoleIdEnvironmentVariable);
-        var secretId = Environment.GetEnvironmentVariable(options.SecretIdEnvironmentVariable);
+        var roleId = await ReadConfiguredSecretAsync(
+            Environment.GetEnvironmentVariable(options.RoleIdEnvironmentVariable),
+            options.RoleIdFile,
+            cancellationToken);
+        var secretId = await ReadConfiguredSecretAsync(
+            Environment.GetEnvironmentVariable(options.SecretIdEnvironmentVariable),
+            options.SecretIdFile,
+            cancellationToken);
         if (string.IsNullOrWhiteSpace(roleId) || string.IsNullOrWhiteSpace(secretId))
         {
-            throw new InvalidOperationException("Vault AppRole material is not available in environment variables.");
+            throw new InvalidOperationException(
+                "Vault AppRole material is not available. " +
+                $"Resolved RoleIdFile='{options.RoleIdFile}', exists={File.Exists(options.RoleIdFile)}; " +
+                $"SecretIdFile='{options.SecretIdFile}', exists={File.Exists(options.SecretIdFile)}.");
         }
 
         using var response = await httpClient.PostAsJsonAsync("/v1/auth/approle/login", new
@@ -117,6 +129,44 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
         var status = $"{(int)response.StatusCode} {response.ReasonPhrase}";
         throw new HttpRequestException($"Vault {operation} failed with {status}. Response: {body}", null, response.StatusCode);
     }
+
+    private static async Task<string> ReadConfiguredSecretAsync(string? value, string file, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(file) || !File.Exists(file)
+            ? string.Empty
+            : (await File.ReadAllTextAsync(file, cancellationToken)).Trim();
+    }
+
+    private static HttpClient CreateHttpClient(VaultOptions options)
+    {
+        var caPath = FirstNonEmpty(options.CaCertFile, options.CaCertificatePath);
+        var handler = new HttpClientHandler();
+        handler.ServerCertificateCustomValidationCallback = (_, certificate, _, _) =>
+        {
+            if (certificate is null || string.IsNullOrWhiteSpace(caPath))
+            {
+                return false;
+            }
+
+            using var ca = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(caPath);
+            using var chain = new System.Security.Cryptography.X509Certificates.X509Chain();
+            chain.ChainPolicy.TrustMode = System.Security.Cryptography.X509Certificates.X509ChainTrustMode.CustomRootTrust;
+            chain.ChainPolicy.CustomTrustStore.Add(ca);
+            chain.ChainPolicy.RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+            return chain.Build(certificate);
+        };
+
+        return new HttpClient(handler);
+    }
+
+    private static string? FirstNonEmpty(params string[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
     private static string Required(JsonObject data, string key)
     {
         if (!TryGet(data, key, out var value))

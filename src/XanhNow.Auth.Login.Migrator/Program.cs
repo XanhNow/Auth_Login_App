@@ -5,9 +5,14 @@ using Microsoft.Extensions.Configuration;
 using Npgsql;
 using XanhNow.Auth.Login.Infrastructure.Persistence;
 
+var environment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+    ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+    ?? "Production";
+
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json", optional: true)
+    .AddJsonFile($"appsettings.{environment}.json", optional: true)
     .AddEnvironmentVariables()
     .AddCommandLine(args)
     .Build();
@@ -288,8 +293,14 @@ static async Task VerifySequencePrivilegesAsync(NpgsqlConnection connection, Lis
 
 static async Task<string?> ReadMigrationConnectionStringFromVaultAsync(IConfiguration configuration, CancellationToken cancellationToken)
 {
-    var roleId = Environment.GetEnvironmentVariable("MIGRATION_VAULT_ROLE_ID");
-    var secretId = Environment.GetEnvironmentVariable("MIGRATION_VAULT_SECRET_ID");
+    var roleId = await ReadConfiguredSecretAsync(
+        Environment.GetEnvironmentVariable("MIGRATION_VAULT_ROLE_ID"),
+        configuration["MigrationVault:RoleIdFile"],
+        cancellationToken);
+    var secretId = await ReadConfiguredSecretAsync(
+        Environment.GetEnvironmentVariable("MIGRATION_VAULT_SECRET_ID"),
+        configuration["MigrationVault:SecretIdFile"],
+        cancellationToken);
     if (string.IsNullOrWhiteSpace(roleId) || string.IsNullOrWhiteSpace(secretId))
     {
         return null;
@@ -299,7 +310,7 @@ static async Task<string?> ReadMigrationConnectionStringFromVaultAsync(IConfigur
     var mountPath = configuration["MigrationVault:MountPath"] ?? "kv";
     var secretPath = configuration["MigrationVault:SecretPath"] ?? "xanhnow/auth-login/postgres/migration";
 
-    using var httpClient = new HttpClient { BaseAddress = new Uri(vaultAddress) };
+    using var httpClient = CreateVaultHttpClient(vaultAddress, configuration["MigrationVault:CaCertFile"] ?? configuration["MigrationVault:CaCertificatePath"]);
     using var loginResponse = await httpClient.PostAsJsonAsync("/v1/auth/approle/login", new
     {
         role_id = roleId,
@@ -323,6 +334,44 @@ static async Task<string?> ReadMigrationConnectionStringFromVaultAsync(IConfigur
     return data.TryGetPropertyValue("connection_string", out var node) && node is not null
         ? node.GetValue<string>()
         : throw new InvalidOperationException("Vault migration secret is missing connection_string.");
+}
+
+static async Task<string?> ReadConfiguredSecretAsync(string? value, string? file, CancellationToken cancellationToken)
+{
+    if (!string.IsNullOrWhiteSpace(value))
+    {
+        return value.Trim();
+    }
+
+    return string.IsNullOrWhiteSpace(file) || !File.Exists(file)
+        ? null
+        : (await File.ReadAllTextAsync(file, cancellationToken)).Trim();
+}
+
+static HttpClient CreateVaultHttpClient(string vaultAddress, string? caPath)
+{
+    if (string.IsNullOrWhiteSpace(caPath))
+    {
+        return new HttpClient { BaseAddress = new Uri(vaultAddress) };
+    }
+
+    var handler = new HttpClientHandler();
+    handler.ServerCertificateCustomValidationCallback = (_, certificate, _, _) =>
+    {
+        if (certificate is null)
+        {
+            return false;
+        }
+
+        using var ca = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(caPath);
+        using var chain = new System.Security.Cryptography.X509Certificates.X509Chain();
+        chain.ChainPolicy.TrustMode = System.Security.Cryptography.X509Certificates.X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(ca);
+        chain.ChainPolicy.RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+        return chain.Build(certificate);
+    };
+
+    return new HttpClient(handler) { BaseAddress = new Uri(vaultAddress) };
 }
 
 static async Task EnsureVaultSuccessAsync(HttpResponseMessage response, string operation, CancellationToken cancellationToken)
