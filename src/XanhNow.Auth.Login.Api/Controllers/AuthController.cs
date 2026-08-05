@@ -48,7 +48,7 @@ public sealed class AuthController : ControllerBase
         }
 
         var value = result.Value!;
-        return Ok(new LoginResponse(value.SessionId, value.ExpiresAt));
+        return Ok(new LoginResponse(value.UserId, value.SessionId, value.ExpiresAt));
     }
 
     [HttpPost("logout")]

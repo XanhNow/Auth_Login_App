@@ -13,7 +13,7 @@ public sealed record LoginUserCommand(
     string? UserAgentHash,
     string CorrelationId);
 
-public sealed record LoginUserResult(string SessionId, DateTimeOffset ExpiresAt);
+public sealed record LoginUserResult(Guid UserId, string SessionId, DateTimeOffset ExpiresAt);
 
 public sealed record LogoutUserCommand(string SessionId, string CorrelationId);
 

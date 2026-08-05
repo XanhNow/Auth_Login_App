@@ -121,7 +121,7 @@ public sealed class LoginUserHandler
         await outbox.WriteUserLoggedInAsync(user, sessionIdHash, command.CorrelationId, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
 
-        return AuthResult<LoginUserResult>.Success(new LoginUserResult(sessionId, expiresAt));
+        return AuthResult<LoginUserResult>.Success(new LoginUserResult(user.UserId.Value, sessionId, expiresAt));
     }
 
     public static string Sha256(string value)
