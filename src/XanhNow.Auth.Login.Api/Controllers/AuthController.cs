@@ -92,6 +92,22 @@ public sealed class AuthController : ControllerBase
         return Ok(new ValidateSessionResponse(value.Valid, value.UserId, value.PhoneNumberMasked, value.ExpiresAt));
     }
 
+    [HttpGet("/internal/v1/accounts/{userId:guid}/status")]
+    public async Task<IActionResult> GetAccountStatus(
+        Guid userId,
+        [FromServices] GetAccountStatusHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetAccountStatusQuery(userId), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Error(result.Error!);
+        }
+
+        var value = result.Value!;
+        return Ok(new AccountStatusResponse(value.UserId, value.MaskedPhoneNumber, value.Status, value.UpdatedAtUtc));
+    }
+
     private string CorrelationId() => HttpContext.Items[CorrelationIdMiddleware.ItemName]?.ToString() ?? $"req-{Guid.NewGuid():N}";
 
     private string? ReadSessionId()

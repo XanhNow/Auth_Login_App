@@ -23,6 +23,10 @@ public sealed record ValidateSessionQuery(string SessionId, string CorrelationId
 
 public sealed record ValidateSessionResult(bool Valid, Guid UserId, string PhoneNumberMasked, DateTimeOffset ExpiresAt);
 
+public sealed record GetAccountStatusQuery(Guid UserId);
+
+public sealed record AccountStatusResult(Guid UserId, string MaskedPhoneNumber, string Status, DateTimeOffset UpdatedAtUtc);
+
 public sealed record PasswordSecret(string Pepper, string PepperVersion, string Algorithm);
 
 public sealed record PostgresSecret(string ConnectionString);
