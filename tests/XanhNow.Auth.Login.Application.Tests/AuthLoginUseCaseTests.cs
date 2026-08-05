@@ -48,6 +48,7 @@ public sealed class AuthLoginUseCaseTests
             .Select(property => property.Name)
             .ToArray();
 
+        Assert.Contains("UserId", names);
         Assert.Contains("SessionId", names);
         Assert.Contains("ExpiresAt", names);
         Assert.DoesNotContain("AccessToken", names);
