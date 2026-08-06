@@ -50,6 +50,7 @@ public sealed class ChangeAccountStateHandler
             return AuthResult<AccountStateChangeResult>.Failure(AuthError.InvalidRequest);
         }
 
+        await users.UpdateAsync(user, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
         return AuthResult<AccountStateChangeResult>.Success(new AccountStateChangeResult(user.UserId.Value, user.Status.ToString(), now));
     }
