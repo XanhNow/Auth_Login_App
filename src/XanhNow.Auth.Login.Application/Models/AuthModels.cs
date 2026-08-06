@@ -48,3 +48,7 @@ public sealed record SessionRecord(
     DateTimeOffset AbsoluteExpiresAt,
     string? ClientInfoHash,
     string CorrelationId);
+
+public sealed record ChangeAccountStateCommand(Guid UserId, string TargetState, string ReasonCode, string? Comment);
+
+public sealed record AccountStateChangeResult(Guid UserId, string Status, DateTimeOffset ChangedAtUtc);

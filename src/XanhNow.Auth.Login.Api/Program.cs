@@ -23,6 +23,7 @@ builder.Services.AddScoped<LoginUserHandler>();
 builder.Services.AddScoped<LogoutUserHandler>();
 builder.Services.AddScoped<ValidateSessionHandler>();
 builder.Services.AddScoped<GetAccountStatusHandler>();
+builder.Services.AddScoped<ChangeAccountStateHandler>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
