@@ -72,14 +72,26 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
 
     private async Task<JsonObject> ReadSecretDataAsync(string name, CancellationToken cancellationToken)
     {
-        var token = await GetTokenAsync(cancellationToken);
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/{options.MountPath}/data/{options.BasePath}/{name}");
-        request.Headers.Add("X-Vault-Token", token);
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        await EnsureVaultSuccessAsync(response, $"read secret '{name}'", cancellationToken);
-        var payload = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken);
-        return payload?["data"]?["data"]?.AsObject()
-            ?? throw new InvalidOperationException("Vault KV v2 response did not contain a data object.");
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var token = await GetTokenAsync(cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/{options.MountPath}/data/{options.BasePath}/{name}");
+            request.Headers.Add("X-Vault-Token", token);
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+
+            if (attempt == 0 && IsTokenRejected(response))
+            {
+                clientToken = null;
+                continue;
+            }
+
+            await EnsureVaultSuccessAsync(response, $"read secret '{name}'", cancellationToken);
+            var payload = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken);
+            return payload?["data"]?["data"]?.AsObject()
+                ?? throw new InvalidOperationException("Vault KV v2 response did not contain a data object.");
+        }
+
+        throw new InvalidOperationException("Vault token refresh retry did not complete.");
     }
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
@@ -117,6 +129,9 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
             ?? throw new InvalidOperationException("Vault AppRole login did not return a client token.");
         return clientToken;
     }
+
+    private static bool IsTokenRejected(HttpResponseMessage response) =>
+        response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;
 
     private static async Task EnsureVaultSuccessAsync(HttpResponseMessage response, string operation, CancellationToken cancellationToken)
     {
