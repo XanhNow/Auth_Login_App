@@ -108,6 +108,23 @@ public sealed class AuthController : ControllerBase
         return Ok(new AccountStatusResponse(value.UserId, value.MaskedPhoneNumber, value.Status, value.UpdatedAtUtc));
     }
 
+    [HttpPost("/internal/v1/accounts/{userId:guid}/state")]
+    public async Task<IActionResult> ChangeAccountState(
+        Guid userId,
+        [FromBody] AccountStateChangeRequest request,
+        [FromServices] ChangeAccountStateHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ChangeAccountStateCommand(userId, request.TargetState, request.ReasonCode, request.Comment), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Error(result.Error!);
+        }
+
+        var value = result.Value!;
+        return Ok(new AccountStateChangeResponse(value.UserId, value.Status, value.ChangedAtUtc));
+    }
+
     private string CorrelationId() => HttpContext.Items[CorrelationIdMiddleware.ItemName]?.ToString() ?? $"req-{Guid.NewGuid():N}";
 
     private string? ReadSessionId()
