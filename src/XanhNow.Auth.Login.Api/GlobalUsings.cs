@@ -3,8 +3,6 @@ global using XanhNow.Auth.Login.Application.Interfaces;
 global using XanhNow.Auth.Login.Application.Models;
 global using XanhNow.Auth.Login.Application.UseCases;
 global using XanhNow.Auth.Login.Infrastructure;
-global using XanhNow.Auth.Login.Infrastructure.Kafka;
-global using XanhNow.Auth.Login.Infrastructure.Outbox;
 global using XanhNow.Auth.Login.Infrastructure.Persistence;
 global using XanhNow.Auth.Login.Infrastructure.Redis;
 global using XanhNow.Auth.Login.Infrastructure.Security;

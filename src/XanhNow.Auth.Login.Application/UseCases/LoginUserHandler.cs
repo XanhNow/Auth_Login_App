@@ -18,7 +18,6 @@ public sealed class LoginUserHandler
     private readonly IVaultSecretProvider vault;
     private readonly IRateLimitService rateLimit;
     private readonly IAuditLogService audit;
-    private readonly IOutboxEventWriter outbox;
     private readonly IUnitOfWork unitOfWork;
     private readonly IClock clock;
 
@@ -29,7 +28,6 @@ public sealed class LoginUserHandler
         IVaultSecretProvider vault,
         IRateLimitService rateLimit,
         IAuditLogService audit,
-        IOutboxEventWriter outbox,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
@@ -39,7 +37,6 @@ public sealed class LoginUserHandler
         this.vault = vault;
         this.rateLimit = rateLimit;
         this.audit = audit;
-        this.outbox = outbox;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
@@ -118,10 +115,9 @@ public sealed class LoginUserHandler
         await sessions.CreateSessionAsync(sessionId, session, SessionTtl, cancellationToken);
         await rateLimit.RecordSuccessAsync(phoneNumber.Normalized, command.ClientIp, cancellationToken);
         await audit.WriteLoginSuccessAsync(user, sessionIdHash, command.CorrelationId, cancellationToken);
-        await outbox.WriteUserLoggedInAsync(user, sessionIdHash, command.CorrelationId, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
 
-        return AuthResult<LoginUserResult>.Success(new LoginUserResult(user.UserId.Value, sessionId, expiresAt));
+        return AuthResult<LoginUserResult>.Success(new LoginUserResult(user.UserId.Value, sessionId, expiresAt, "password"));
     }
 
     public static string Sha256(string value)

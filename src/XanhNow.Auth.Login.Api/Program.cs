@@ -46,7 +46,6 @@ builder.Services.AddSingleton<IVaultSecretProvider>(vaultProvider);
 builder.Services.AddDbContext<AuthDbContext>(options => options.UseNpgsql(postgresSecret.ConnectionString));
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<IAuditLogService, EfAuditLogService>();
-builder.Services.AddScoped<IOutboxEventWriter, EfOutboxEventWriter>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
 if (string.Equals(infrastructureMode, "Real", StringComparison.OrdinalIgnoreCase) ||
@@ -70,22 +69,6 @@ if (string.Equals(infrastructureMode, "Real", StringComparison.OrdinalIgnoreCase
     builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConfiguration));
     builder.Services.AddSingleton<ISessionCache, RedisSessionCache>();
     builder.Services.AddSingleton<IRateLimitService, RedisRateLimitService>();
-}
-
-if (string.Equals(infrastructureMode, "Real", StringComparison.OrdinalIgnoreCase))
-{
-    var kafkaSecret = vaultProvider.ReadKafkaSecretAsync(CancellationToken.None).GetAwaiter().GetResult();
-    var kafkaOptions = new KafkaOptions();
-    builder.Configuration.GetSection("Kafka").Bind(kafkaOptions);
-    var outboxOptions = new OutboxOptions();
-    builder.Configuration.GetSection("Outbox").Bind(outboxOptions);
-
-    builder.Services.AddSingleton(kafkaOptions);
-    builder.Services.AddSingleton(outboxOptions);
-    builder.Services.AddSingleton(kafkaSecret);
-    builder.Services.AddSingleton<KafkaAuthEventProducer>();
-    builder.Services.AddScoped<OutboxDispatcher>();
-    builder.Services.AddHostedService<OutboxDispatcherHostedService>();
 }
 
 var app = builder.Build();
@@ -183,11 +166,6 @@ async Task<IResult> ReadyHealth(IServiceProvider services, CancellationToken can
         checks.Add(await CheckRedisAsync(services));
     }
 
-    if (string.Equals(infrastructureMode, "Real", StringComparison.OrdinalIgnoreCase))
-    {
-        checks.Add(await CheckKafkaAsync(services, cancellationToken));
-    }
-
     var healthy = checks.All(check => check.Healthy);
     var body = new
     {
@@ -230,32 +208,6 @@ static async Task<DependencyHealthCheck> CheckRedisAsync(IServiceProvider servic
     catch (Exception ex)
     {
         return DependencyHealthCheck.Fail("redis", ex.Message);
-    }
-}
-
-static Task<DependencyHealthCheck> CheckKafkaAsync(IServiceProvider services, CancellationToken cancellationToken)
-{
-    try
-    {
-        var options = services.GetRequiredService<KafkaOptions>();
-        using var adminClient = new Confluent.Kafka.AdminClientBuilder(new Confluent.Kafka.AdminClientConfig
-        {
-            BootstrapServers = options.BootstrapServers,
-            ClientId = $"{options.ClientId}-health"
-        }).Build();
-
-        var metadata = adminClient.GetMetadata(options.TopicName, TimeSpan.FromSeconds(5));
-        var topic = metadata.Topics.SingleOrDefault(item => item.Topic == options.TopicName);
-        if (topic is null || topic.Error.IsError)
-        {
-            return Task.FromResult(DependencyHealthCheck.Fail("kafka", topic?.Error.Reason ?? "Topic metadata was not found."));
-        }
-
-        return Task.FromResult(DependencyHealthCheck.Ok("kafka"));
-    }
-    catch (Exception ex)
-    {
-        return Task.FromResult(DependencyHealthCheck.Fail("kafka", ex.Message));
     }
 }
 

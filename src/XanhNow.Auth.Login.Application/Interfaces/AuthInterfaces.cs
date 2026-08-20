@@ -64,22 +64,11 @@ public interface IAuditLogService
     Task WriteRateLimitedAsync(string phoneNumberMasked, string correlationId, CancellationToken cancellationToken);
 }
 
-public interface IOutboxEventWriter
-{
-    Task WriteUserRegisteredAsync(User user, string correlationId, CancellationToken cancellationToken);
-
-    Task WriteUserLoggedInAsync(User user, string sessionIdHash, string correlationId, CancellationToken cancellationToken);
-
-    Task WriteUserLoggedOutAsync(UserId userId, string sessionIdHash, string correlationId, CancellationToken cancellationToken);
-}
-
 public interface IVaultSecretProvider
 {
     Task<PostgresSecret> ReadPostgresSecretAsync(CancellationToken cancellationToken);
 
     Task<RedisSecret> ReadRedisSecretAsync(CancellationToken cancellationToken);
-
-    Task<KafkaSecret> ReadKafkaSecretAsync(CancellationToken cancellationToken);
 
     Task<PasswordSecret> ReadPasswordSecretAsync(string? pepperVersion, CancellationToken cancellationToken);
 }

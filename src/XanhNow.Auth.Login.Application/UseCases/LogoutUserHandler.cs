@@ -7,14 +7,12 @@ public sealed class LogoutUserHandler
 {
     private readonly ISessionCache sessions;
     private readonly IAuditLogService audit;
-    private readonly IOutboxEventWriter outbox;
     private readonly IUnitOfWork unitOfWork;
 
-    public LogoutUserHandler(ISessionCache sessions, IAuditLogService audit, IOutboxEventWriter outbox, IUnitOfWork unitOfWork)
+    public LogoutUserHandler(ISessionCache sessions, IAuditLogService audit, IUnitOfWork unitOfWork)
     {
         this.sessions = sessions;
         this.audit = audit;
-        this.outbox = outbox;
         this.unitOfWork = unitOfWork;
     }
 
@@ -29,7 +27,6 @@ public sealed class LogoutUserHandler
         {
             await sessions.UntrackUserSessionAsync(session.UserId, command.SessionId, cancellationToken);
             await audit.WriteLogoutAsync(session.UserId, sessionIdHash, command.CorrelationId, cancellationToken);
-            await outbox.WriteUserLoggedOutAsync(session.UserId, sessionIdHash, command.CorrelationId, cancellationToken);
         }
         else
         {

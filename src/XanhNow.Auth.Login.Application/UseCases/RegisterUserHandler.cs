@@ -11,7 +11,6 @@ public sealed class RegisterUserHandler
     private readonly IPasswordHasher passwordHasher;
     private readonly IVaultSecretProvider vault;
     private readonly IAuditLogService audit;
-    private readonly IOutboxEventWriter outbox;
     private readonly IUnitOfWork unitOfWork;
     private readonly IClock clock;
     private readonly PasswordPolicy passwordPolicy = new();
@@ -21,7 +20,6 @@ public sealed class RegisterUserHandler
         IPasswordHasher passwordHasher,
         IVaultSecretProvider vault,
         IAuditLogService audit,
-        IOutboxEventWriter outbox,
         IUnitOfWork unitOfWork,
         IClock clock)
     {
@@ -29,7 +27,6 @@ public sealed class RegisterUserHandler
         this.passwordHasher = passwordHasher;
         this.vault = vault;
         this.audit = audit;
-        this.outbox = outbox;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
@@ -52,7 +49,6 @@ public sealed class RegisterUserHandler
 
             await users.AddAsync(user, cancellationToken);
             await audit.WriteRegisterSuccessAsync(user, command.CorrelationId, cancellationToken);
-            await outbox.WriteUserRegisteredAsync(user, command.CorrelationId, cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);
 
             return AuthResult<RegisterUserResult>.Success(new RegisterUserResult(user.UserId.Value, user.PhoneNumber.Masked, user.Status.ToString()));

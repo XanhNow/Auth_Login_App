@@ -6,7 +6,7 @@ public sealed record RegisterResponse(Guid UserId, string PhoneNumberMasked, str
 
 public sealed record LoginRequest(string PhoneNumber, string Password);
 
-public sealed record LoginResponse(Guid UserId, string SessionId, DateTimeOffset ExpiresAt);
+public sealed record LoginResponse(Guid UserId, string SessionId, DateTimeOffset ExpiresAt, string AssuranceLevel);
 
 public sealed record LogoutResponse(string Message);
 

@@ -13,7 +13,7 @@ public sealed record LoginUserCommand(
     string? UserAgentHash,
     string CorrelationId);
 
-public sealed record LoginUserResult(Guid UserId, string SessionId, DateTimeOffset ExpiresAt);
+public sealed record LoginUserResult(Guid UserId, string SessionId, DateTimeOffset ExpiresAt, string AssuranceLevel);
 
 public sealed record LogoutUserCommand(string SessionId, string CorrelationId);
 
@@ -32,8 +32,6 @@ public sealed record PasswordSecret(string Pepper, string PepperVersion, string 
 public sealed record PostgresSecret(string ConnectionString);
 
 public sealed record RedisSecret(string Password, bool TlsEnabled);
-
-public sealed record KafkaSecret(string? Username, string? Password, string? SecurityProtocol, string? SaslMechanism);
 
 public sealed record PasswordHashResult(string Hash, string Algorithm, string PepperVersion);
 

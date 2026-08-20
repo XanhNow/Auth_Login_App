@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using System.Net;
 using System.Text.Json.Nodes;
 using XanhNow.Auth.Login.Application.Interfaces;
@@ -23,7 +23,7 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
 
     public async Task<PostgresSecret> ReadPostgresSecretAsync(CancellationToken cancellationToken)
     {
-        var data = await ReadSecretDataAsync("postgres", cancellationToken);
+        var data = await ReadSecretDataAsync("postgres/runtime", cancellationToken);
         if (TryGet(data, "connection_string", out var connectionString))
         {
             return new PostgresSecret(connectionString);
@@ -51,19 +51,9 @@ public sealed class VaultSecretProvider : IVaultSecretProvider
         return new RedisSecret(Required(data, "password"), tls);
     }
 
-    public async Task<KafkaSecret> ReadKafkaSecretAsync(CancellationToken cancellationToken)
-    {
-        var data = await ReadSecretDataAsync("kafka", cancellationToken);
-        return new KafkaSecret(
-            Optional(data, "username"),
-            Optional(data, "password"),
-            Optional(data, "security_protocol"),
-            Optional(data, "sasl_mechanism"));
-    }
-
     public async Task<PasswordSecret> ReadPasswordSecretAsync(string? pepperVersion, CancellationToken cancellationToken)
     {
-        var data = await ReadSecretDataAsync("password", cancellationToken);
+        var data = await ReadSecretDataAsync("password-hashing", cancellationToken);
         return new PasswordSecret(
             Required(data, "pepper"),
             pepperVersion ?? Optional(data, "pepper_version") ?? "active",
