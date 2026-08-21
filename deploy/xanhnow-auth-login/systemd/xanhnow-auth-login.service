@@ -1,7 +1,7 @@
 [Unit]
 Description=XanhNow Auth Login API
-After=network-online.target
-Wants=network-online.target
+After=network-online.target xanhnow-auth-login-vault-agent.service
+Wants=network-online.target xanhnow-auth-login-vault-agent.service
 
 [Service]
 Type=simple
@@ -17,10 +17,12 @@ Environment=DOTNET_ENVIRONMENT=Production
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://0.0.0.0:8080
 Environment=Infrastructure__Mode=RedisVault
-Environment=Vault__BasePath=xanhnow/s101/auth-login
-Environment=Vault__RoleIdFile=/etc/xanhnow/s101/auth-login/vault/role_id
-Environment=Vault__SecretIdFile=/etc/xanhnow/s101/auth-login/vault/secret_id
-Environment=Vault__CaCertFile=/etc/xanhnow/s101/auth-login/trust/vault-ca.crt
+Environment=RuntimeSecrets__PostgresConnectionStringFile=/srv/xanhnow/s101/secrets/auth-login/postgres-connection-string
+Environment=RuntimeSecrets__RedisPasswordFile=/srv/xanhnow/s101/secrets/auth-login/redis-password
+Environment=RuntimeSecrets__RedisTlsEnabledFile=/srv/xanhnow/s101/secrets/auth-login/redis-tls-enabled
+Environment=RuntimeSecrets__PasswordPepperFile=/srv/xanhnow/s101/secrets/auth-login/password-pepper
+Environment=RuntimeSecrets__PasswordPepperVersionFile=/srv/xanhnow/s101/secrets/auth-login/password-pepper-version
+Environment=RuntimeSecrets__PasswordAlgorithmFile=/srv/xanhnow/s101/secrets/auth-login/password-algorithm
 NoNewPrivileges=true
 
 [Install]

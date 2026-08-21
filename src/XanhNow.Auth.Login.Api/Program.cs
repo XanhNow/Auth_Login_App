@@ -37,13 +37,20 @@ if (!string.Equals(infrastructureMode, "Real", StringComparison.OrdinalIgnoreCas
     throw new InvalidOperationException("Infrastructure mode must be PostgreSqlVault, RedisVault or Real. In-memory infrastructure is not supported.");
 }
 
+var runtimeSecretFiles = new RuntimeSecretFilesOptions();
+builder.Configuration.GetSection("RuntimeSecrets").Bind(runtimeSecretFiles);
+
 var vaultOptions = new VaultOptions();
 builder.Configuration.GetSection("Vault").Bind(vaultOptions);
-var vaultHttpClient = new HttpClient { BaseAddress = new Uri(vaultOptions.Address) };
-var vaultProvider = new VaultSecretProvider(vaultHttpClient, vaultOptions);
-var postgresSecret = vaultProvider.ReadPostgresSecretAsync(CancellationToken.None).GetAwaiter().GetResult();
 
-builder.Services.AddSingleton<IVaultSecretProvider>(vaultProvider);
+IVaultSecretProvider secretProvider = runtimeSecretFiles.HasPostgresFile ||
+                                      runtimeSecretFiles.HasRedisFile ||
+                                      runtimeSecretFiles.HasPasswordSecretFile
+    ? new RuntimeSecretFileProvider(runtimeSecretFiles)
+    : new VaultSecretProvider(new HttpClient { BaseAddress = new Uri(vaultOptions.Address) }, vaultOptions);
+var postgresSecret = secretProvider.ReadPostgresSecretAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+builder.Services.AddSingleton(secretProvider);
 builder.Services.AddDbContext<AuthDbContext>(options => options.UseNpgsql(postgresSecret.ConnectionString));
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<IAuditLogService, EfAuditLogService>();
@@ -52,7 +59,7 @@ builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 if (string.Equals(infrastructureMode, "Real", StringComparison.OrdinalIgnoreCase) ||
     string.Equals(infrastructureMode, "RedisVault", StringComparison.OrdinalIgnoreCase))
 {
-    var redisSecret = vaultProvider.ReadRedisSecretAsync(CancellationToken.None).GetAwaiter().GetResult();
+    var redisSecret = secretProvider.ReadRedisSecretAsync(CancellationToken.None).GetAwaiter().GetResult();
 
     var redisOptions = new RedisOptions();
     builder.Configuration.GetSection("Redis").Bind(redisOptions);

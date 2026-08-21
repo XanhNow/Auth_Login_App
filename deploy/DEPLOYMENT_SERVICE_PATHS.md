@@ -40,15 +40,17 @@ The published API DLL is:
 XanhNow.Auth.Login.Api.dll
 ```
 
-The production systemd unit template is:
+The production systemd unit templates are:
 
 ```text
 deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service
+deploy/xanhnow-auth-login/systemd/xanhnow-auth-login-vault-agent.service
 ```
 
 Install it as:
 
 ```bash
+sudo bash deploy/xanhnow-auth-login/install-vault-agent-node.sh
 sudo cp deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service /etc/systemd/system/xanhnow-auth-login.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now xanhnow-auth-login
@@ -56,22 +58,35 @@ sudo systemctl enable --now xanhnow-auth-login
 
 ## Runtime environment
 
-Runtime must use the s101 Vault AppRole:
+Runtime production secrets are rendered by Vault Agent. The Login API reads local files only:
 
 ```text
-Vault__BasePath=xanhnow/s101/auth-login
-Vault__RoleIdFile=/etc/xanhnow/s101/auth-login/vault/role_id
-Vault__SecretIdFile=/etc/xanhnow/s101/auth-login/vault/secret_id
-Vault__CaCertFile=/etc/xanhnow/s101/auth-login/trust/vault-ca.crt
 Infrastructure__Mode=RedisVault
+RuntimeSecrets__PostgresConnectionStringFile=/srv/xanhnow/s101/secrets/auth-login/postgres-connection-string
+RuntimeSecrets__RedisPasswordFile=/srv/xanhnow/s101/secrets/auth-login/redis-password
+RuntimeSecrets__RedisTlsEnabledFile=/srv/xanhnow/s101/secrets/auth-login/redis-tls-enabled
+RuntimeSecrets__PasswordPepperFile=/srv/xanhnow/s101/secrets/auth-login/password-pepper
+RuntimeSecrets__PasswordPepperVersionFile=/srv/xanhnow/s101/secrets/auth-login/password-pepper-version
+RuntimeSecrets__PasswordAlgorithmFile=/srv/xanhnow/s101/secrets/auth-login/password-algorithm
 ```
 
-Required local files:
+Vault Agent uses the s101 runtime AppRole material:
 
 ```text
 /etc/xanhnow/s101/auth-login/vault/role_id
 /etc/xanhnow/s101/auth-login/vault/secret_id
 /etc/xanhnow/s101/auth-login/trust/vault-ca.crt
+```
+
+Rendered runtime secret files:
+
+```text
+/srv/xanhnow/s101/secrets/auth-login/postgres-connection-string
+/srv/xanhnow/s101/secrets/auth-login/redis-password
+/srv/xanhnow/s101/secrets/auth-login/redis-tls-enabled
+/srv/xanhnow/s101/secrets/auth-login/password-pepper
+/srv/xanhnow/s101/secrets/auth-login/password-pepper-version
+/srv/xanhnow/s101/secrets/auth-login/password-algorithm
 ```
 
 ## Vault paths
@@ -149,6 +164,7 @@ mkdir -p "$release_dir/publish/api"
 /home/xanhnow/.dotnet-10.0.400/dotnet publish src/XanhNow.Auth.Login.Api/XanhNow.Auth.Login.Api.csproj -c Release -o "$release_dir/publish/api"
 printf '{"app":"Auth_Login_App","commit":"%s"}\n' "$(git rev-parse HEAD)" > "$release_dir/release.json"
 sudo cp deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service /etc/systemd/system/xanhnow-auth-login.service
+sudo bash deploy/xanhnow-auth-login/install-vault-agent-node.sh
 sudo bash deploy/xanhnow-auth-login/deploy-api-node.sh "$release_dir"
 bash deploy/xanhnow-auth-login/healthcheck.sh
 ```
@@ -195,7 +211,8 @@ Login is production-ready when all are true:
 ```text
 dotnet build -c Release: pass
 dotnet test -c Release: pass
-Vault runtime AppRole can read s101 runtime secrets
+Vault Agent is active on every API node
+Vault Agent renders non-empty s101 runtime secret files
 Vault migrator AppRole can read s101 migration secret
 PostgreSQL runtime/migrator roles verified
 migrator privilege verification: pass

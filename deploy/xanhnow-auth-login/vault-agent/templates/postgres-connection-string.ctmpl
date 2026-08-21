@@ -1,0 +1,7 @@
+{{- with secret "kv/data/xanhnow/s101/auth-login/postgres/runtime" -}}
+{{- if .Data.data.connection_string -}}
+{{ .Data.data.connection_string }}
+{{- else -}}
+Host={{ .Data.data.host }};Port={{ or .Data.data.port "5432" }};Database={{ .Data.data.database }};Username={{ .Data.data.username }};Password={{ .Data.data.password }};Pooling=true;No Reset On Close=true;Timeout=15;Command Timeout=30{{ if .Data.data.ssl_mode }};SSL Mode={{ .Data.data.ssl_mode }}{{ end }}
+{{- end -}}
+{{- end -}}
