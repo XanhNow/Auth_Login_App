@@ -27,8 +27,8 @@ No app outside Security should call Auth Login directly.
 
 - Database: `authtest`
 - Schema: `auth`
-- Runtime user: `xanhnow_auth`
-- Migration user: `xanhnow_auth_migrator`
+- Runtime user: `s101_xanhnow_auth_login_runtime`
+- Migration user: `s101_xanhnow_auth_login_migrator`
 - Admin/migration endpoint: `192.168.2.80:15432`
 - Runtime endpoint comes from Vault runtime secret.
 - API runtime must not run migrations.
@@ -159,3 +159,5 @@ migrator privilege verification: pass
 Security -> Auth Login internal lookup: HTTP 200 for an existing user
 Admin -> Security -> Auth Login recovery lookup: HTTP 200 for an existing user
 ```
+
+

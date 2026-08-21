@@ -18,8 +18,8 @@ function Convert-SecureStringToPlainText([securestring]$Value) {
     }
 }
 
-$migratorPassword = Convert-SecureStringToPlainText (Read-Host "Password xanhnow_auth_migrator" -AsSecureString)
-$connectionString = "Host=$HostName;Port=$Port;Database=$Database;Username=xanhnow_auth_migrator;Password=$migratorPassword;SSL Mode=VerifyFull;Root Certificate=$RootCert"
+$migratorPassword = Convert-SecureStringToPlainText (Read-Host "Password s101_xanhnow_auth_login_migrator" -AsSecureString)
+$connectionString = "Host=$HostName;Port=$Port;Database=$Database;Username=s101_xanhnow_auth_login_migrator;Password=$migratorPassword;SSL Mode=VerifyFull;Root Certificate=$RootCert"
 
 Push-Location $ProjectRoot
 try {
@@ -51,3 +51,5 @@ try {
     Remove-Item Env:\ASPNETCORE_ENVIRONMENT -ErrorAction SilentlyContinue
     Pop-Location
 }
+
+

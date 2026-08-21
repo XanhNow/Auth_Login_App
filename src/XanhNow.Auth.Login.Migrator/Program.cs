@@ -27,9 +27,9 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 var connectionStringBuilder = new NpgsqlConnectionStringBuilder(connectionString);
-if (!string.Equals(connectionStringBuilder.Username, "xanhnow_auth_migrator", StringComparison.Ordinal))
+if (!string.Equals(connectionStringBuilder.Username, "s101_xanhnow_auth_login_migrator", StringComparison.Ordinal))
 {
-    throw new InvalidOperationException("Migration must run as xanhnow_auth_migrator. Runtime user xanhnow_auth is not allowed to run DDL.");
+    throw new InvalidOperationException("Migration must run as s101_xanhnow_auth_login_migrator. Runtime user s101_xanhnow_auth_login_runtime is not allowed to run DDL.");
 }
 
 if (!string.Equals(connectionStringBuilder.Host, "192.168.2.80", StringComparison.Ordinal) ||
@@ -52,14 +52,14 @@ var options = new DbContextOptionsBuilder<AuthDbContext>()
 await using var dbContext = new AuthDbContext(options);
 await dbContext.Database.MigrateAsync();
 await dbContext.Database.ExecuteSqlRawAsync("""
-    GRANT USAGE ON SCHEMA auth TO xanhnow_auth;
+    GRANT USAGE ON SCHEMA auth TO s101_xanhnow_auth_login_runtime;
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
         auth.users,
         auth.user_phone_histories,
         auth.login_attempts,
         auth.auth_audit_logs,
         auth.outbox_events
-    TO xanhnow_auth;
+    TO s101_xanhnow_auth_login_runtime;
     """);
 
 Console.WriteLine("Auth Login database migration completed and runtime grants applied.");
@@ -104,20 +104,20 @@ static async Task VerifyRuntimeRoleAsync(NpgsqlConnection connection, List<strin
     await using var command = new NpgsqlCommand("""
         SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication
         FROM pg_roles
-        WHERE rolname = 'xanhnow_auth';
+        WHERE rolname = 's101_xanhnow_auth_login_runtime';
         """, connection);
 
     await using var reader = await command.ExecuteReaderAsync(cancellationToken);
     if (!await reader.ReadAsync(cancellationToken))
     {
-        failures.Add("runtime role xanhnow_auth does not exist");
+        failures.Add("runtime role s101_xanhnow_auth_login_runtime does not exist");
         return;
     }
 
     var isElevated = reader.GetBoolean(0) || reader.GetBoolean(1) || reader.GetBoolean(2) || reader.GetBoolean(3);
     if (isElevated)
     {
-        failures.Add("runtime role xanhnow_auth has superuser/createdb/createrole/replication privilege");
+        failures.Add("runtime role s101_xanhnow_auth_login_runtime has superuser/createdb/createrole/replication privilege");
         return;
     }
 
@@ -128,8 +128,8 @@ static async Task VerifySchemaPrivilegesAsync(NpgsqlConnection connection, List<
 {
     await using var command = new NpgsqlCommand("""
         SELECT
-            has_schema_privilege('xanhnow_auth', 'auth', 'USAGE'),
-            has_schema_privilege('xanhnow_auth', 'auth', 'CREATE');
+            has_schema_privilege('s101_xanhnow_auth_login_runtime', 'auth', 'USAGE'),
+            has_schema_privilege('s101_xanhnow_auth_login_runtime', 'auth', 'CREATE');
         """, connection);
 
     await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -149,7 +149,7 @@ static async Task VerifySchemaPrivilegesAsync(NpgsqlConnection connection, List<
 static async Task VerifyRoleMembershipAsync(NpgsqlConnection connection, List<string> failures, CancellationToken cancellationToken)
 {
     await using var command = new NpgsqlCommand("""
-        SELECT pg_has_role('xanhnow_auth', 'xanhnow_auth_migrator', 'member');
+        SELECT pg_has_role('s101_xanhnow_auth_login_runtime', 's101_xanhnow_auth_login_migrator', 'member');
         """, connection);
 
     var isMemberOfMigrator = (bool)(await command.ExecuteScalarAsync(cancellationToken)
@@ -157,7 +157,7 @@ static async Task VerifyRoleMembershipAsync(NpgsqlConnection connection, List<st
 
     if (isMemberOfMigrator)
     {
-        failures.Add("runtime user must not be a member of xanhnow_auth_migrator");
+        failures.Add("runtime user must not be a member of s101_xanhnow_auth_login_migrator");
         return;
     }
 
@@ -175,12 +175,12 @@ static async Task VerifyTablePrivilegesAsync(NpgsqlConnection connection, string
         SELECT
             c.relname,
             pg_get_userbyid(c.relowner) AS owner,
-            has_table_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'SELECT') AS can_select,
-            has_table_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'INSERT') AS can_insert,
-            has_table_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'UPDATE') AS can_update,
-            has_table_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'DELETE') AS can_delete,
-            has_table_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'TRUNCATE') AS can_truncate,
-            has_table_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'TRIGGER') AS can_trigger
+            has_table_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'SELECT') AS can_select,
+            has_table_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'INSERT') AS can_insert,
+            has_table_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'UPDATE') AS can_update,
+            has_table_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'DELETE') AS can_delete,
+            has_table_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'TRUNCATE') AS can_truncate,
+            has_table_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'TRIGGER') AS can_trigger
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'auth'
@@ -200,7 +200,7 @@ static async Task VerifyTablePrivilegesAsync(NpgsqlConnection connection, string
 
         seenTables.Add(tableName);
 
-        if (string.Equals(owner, "xanhnow_auth", StringComparison.Ordinal))
+        if (string.Equals(owner, "s101_xanhnow_auth_login_runtime", StringComparison.Ordinal))
         {
             runtimeOwnedTables.Add(tableName);
         }
@@ -256,9 +256,9 @@ static async Task VerifySequencePrivilegesAsync(NpgsqlConnection connection, Lis
     await using var command = new NpgsqlCommand("""
         SELECT
             c.relname,
-            has_sequence_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'USAGE') AS can_usage,
-            has_sequence_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'SELECT') AS can_select,
-            has_sequence_privilege('xanhnow_auth', format('%I.%I', n.nspname, c.relname), 'UPDATE') AS can_update
+            has_sequence_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'USAGE') AS can_usage,
+            has_sequence_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'SELECT') AS can_select,
+            has_sequence_privilege('s101_xanhnow_auth_login_runtime', format('%I.%I', n.nspname, c.relname), 'UPDATE') AS can_update
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'auth'
@@ -385,3 +385,5 @@ static async Task EnsureVaultSuccessAsync(HttpResponseMessage response, string o
     var status = $"{(int)response.StatusCode} {response.ReasonPhrase}";
     throw new HttpRequestException($"Vault {operation} failed with {status}. Response: {body}", null, response.StatusCode);
 }
+
+

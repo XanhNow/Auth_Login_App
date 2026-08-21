@@ -119,8 +119,8 @@ kv/xanhnow/s101/auth-login/postgres/migration
 Auth Login owns its own PostgreSQL identities even when sharing database `authtest`.
 
 ```text
-xanhnow_auth_migrator
-xanhnow_auth
+s101_xanhnow_auth_login_migrator
+s101_xanhnow_auth_login_runtime
 ```
 
 Use:
@@ -204,3 +204,5 @@ migrator privilege verification: pass
 Security -> Auth Login internal lookup: HTTP 200 for an existing user
 Admin -> Security -> Auth Login recovery lookup: HTTP 200 for an existing user
 ```
+
+

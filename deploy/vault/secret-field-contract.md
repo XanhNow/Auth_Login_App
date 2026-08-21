@@ -11,7 +11,7 @@ Accepted formats:
 
 Expected runtime endpoint: `192.168.2.80:5432` through PgBouncer transaction pooling.
 
-Runtime username: `xanhnow_auth`.
+Runtime username: `s101_xanhnow_auth_login_runtime`.
 
 ## `kv/xanhnow/s101/auth-login/postgres/migration`
 
@@ -21,7 +21,7 @@ Preferred field:
 
 Expected migration endpoint: `192.168.2.80:15432` through admin/primary path.
 
-Migration username: `xanhnow_auth_migrator`.
+Migration username: `s101_xanhnow_auth_login_migrator`.
 
 ## `kv/xanhnow/s101/auth-login/redis`
 
@@ -37,3 +37,5 @@ Redis endpoints remain in appsettings unless overridden:
 ## `kv/xanhnow/s101/auth-login/password-hashing`
 
 Fields are consumed by the password hasher implementation. Do not print or commit values.
+
+
