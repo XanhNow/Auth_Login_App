@@ -108,6 +108,22 @@ public sealed class AuthController : ControllerBase
         return Ok(new AccountStatusResponse(value.UserId, value.MaskedPhoneNumber, value.Status, value.UpdatedAtUtc));
     }
 
+    [HttpGet("/internal/v1/accounts/by-phone/status")]
+    public async Task<IActionResult> GetAccountByPhone(
+        [FromQuery] string phoneNumber,
+        [FromServices] GetAccountByPhoneHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetAccountByPhoneQuery(phoneNumber), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Error(result.Error!);
+        }
+
+        var value = result.Value!;
+        return Ok(new AccountStatusResponse(value.UserId, value.MaskedPhoneNumber, value.Status, value.UpdatedAtUtc));
+    }
+
     [HttpPost("/internal/v1/accounts/{userId:guid}/state")]
     public async Task<IActionResult> ChangeAccountState(
         Guid userId,

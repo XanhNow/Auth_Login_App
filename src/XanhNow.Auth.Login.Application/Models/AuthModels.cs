@@ -25,6 +25,8 @@ public sealed record ValidateSessionResult(bool Valid, Guid UserId, string Phone
 
 public sealed record GetAccountStatusQuery(Guid UserId);
 
+public sealed record GetAccountByPhoneQuery(string PhoneNumber);
+
 public sealed record AccountStatusResult(Guid UserId, string MaskedPhoneNumber, string Status, DateTimeOffset UpdatedAtUtc);
 
 public sealed record PasswordSecret(string Pepper, string PepperVersion, string Algorithm);
