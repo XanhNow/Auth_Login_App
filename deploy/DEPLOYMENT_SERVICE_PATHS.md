@@ -1,13 +1,13 @@
 # Auth Login deployment service/process paths
 
-This is the deployment contract for the Edge-facing Login API.
+This is the production deployment contract for the independent Auth Login app.
 
 ## Runtime placement
 
-Auth Login is an HTTP API behind the Edge layer:
+Auth Login is a Security child app. External clients must not call it directly.
 
 ```text
-Client/Postman -> Edge VIP 192.168.2.82 -> Nginx /api/ -> API pool 192.168.2.25/.38/.65:8080
+Client -> Gateway -> Security -> Auth Login
 ```
 
 Deploy it on the API pool nodes:
@@ -24,19 +24,14 @@ The app listens on HTTP only:
 ASPNETCORE_URLS=http://0.0.0.0:8080
 ```
 
-Do not enable HTTPS redirection for this internal Edge integration stage. Public TLS/domain/VPS ingress belongs to a separate runbook.
+## Production layout
 
-## Release layout
-
-Use the Edge API release layout under the `xanhnow` Linux user:
+Use the system service layout under `/srv`:
 
 ```text
-/home/xanhnow/xanhnow-auth-login/
-  config/runtime.env
-  incoming/
-  releases/
-  current -> releases/<release-id>
-  previous -> releases/<previous-release-id>
+/srv/xanhnow/apps/auth-login/releases/<release-id>
+/srv/xanhnow/apps/auth-login/current -> releases/<release-id>
+/srv/xanhnow/apps/auth-login/previous -> releases/<previous-release-id>
 ```
 
 The published API DLL is:
@@ -45,101 +40,52 @@ The published API DLL is:
 XanhNow.Auth.Login.Api.dll
 ```
 
-The systemd user unit template is:
+The production systemd unit template is:
 
 ```text
-deploy/systemd/xanhnow-auth-login.service
+deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service
 ```
 
 Install it as:
 
 ```bash
-install -d -o xanhnow -g xanhnow -m 0750 /home/xanhnow/.config/systemd/user
-install -o xanhnow -g xanhnow -m 0640 deploy/systemd/xanhnow-auth-login.service /home/xanhnow/.config/systemd/user/xanhnow-auth-login.service
-loginctl enable-linger xanhnow
-sudo -iu xanhnow systemctl --user daemon-reload
-sudo -iu xanhnow systemctl --user enable --now xanhnow-auth-login.service
+sudo cp deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service /etc/systemd/system/xanhnow-auth-login.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now xanhnow-auth-login
 ```
 
 ## Runtime environment
 
-`/home/xanhnow/xanhnow-auth-login/config/runtime.env` must be root/xanhnow protected and must not be committed.
-
-Required runtime variables:
+Runtime must use the s101 Vault AppRole:
 
 ```text
-VAULT_ROLE_ID=<auth-login role id>
-VAULT_SECRET_ID=<fresh auth-login secret id>
-Infrastructure__Mode=Real
-Vault__Address=https://192.168.2.81:8200
-Http__EnableHttpsRedirection=false
-```
-
-Optional if the appsettings defaults remain valid:
-
-```text
-Vault__MountPath=kv
 Vault__BasePath=xanhnow/s101/auth-login
+Vault__RoleIdFile=/etc/xanhnow/s101/auth-login/vault/role_id
+Vault__SecretIdFile=/etc/xanhnow/s101/auth-login/vault/secret_id
+Vault__CaCertFile=/etc/xanhnow/s101/auth-login/trust/vault-ca.crt
+Infrastructure__Mode=RedisVault
 ```
 
-## Edge-facing endpoints
-
-The Login app supports both direct local health paths and Edge `/api/` paths:
+Required local files:
 
 ```text
-GET /health/live
-GET /health/ready
-GET /api/health/live
-GET /api/health/ready
-GET /api/edge-probe
-```
-
-Auth endpoints remain:
-
-```text
-POST /api/auth/register
-POST /api/auth/login
-POST /api/auth/logout
-GET  /api/auth/session
-```
-
-The app trusts forwarded headers only from:
-
-```text
-edge-gw-1 192.168.2.24
-edge-gw-2 192.168.2.64
-```
-
-## Migration
-
-The API runtime must not run migrations.
-
-Run the migrator separately with the migrator identity. The migrator requires `xanhnow_auth_migrator`, host `192.168.2.80`, port `15432`, database `authtest`.
-
-Accepted ways to provide the migration connection string:
-
-```text
-ConnectionStrings__AuthMigrationDb
-AUTH_LOGIN_MIGRATION_CONNECTION_STRING
-MIGRATION_VAULT_ROLE_ID + MIGRATION_VAULT_SECRET_ID
-```
-
-Recommended verification before/after migration:
-
-```bash
-dotnet XanhNow.Auth.Login.Migrator.dll --verify-privileges
-dotnet XanhNow.Auth.Login.Migrator.dll
-dotnet XanhNow.Auth.Login.Migrator.dll --verify-privileges
+/etc/xanhnow/s101/auth-login/vault/role_id
+/etc/xanhnow/s101/auth-login/vault/secret_id
+/etc/xanhnow/s101/auth-login/trust/vault-ca.crt
 ```
 
 ## Vault paths
 
-Runtime AppRole: `auth-login`
-
-Expected KV root:
+Runtime AppRole:
 
 ```text
-kv/xanhnow/s101/auth-login
+s101-xanhnow-auth-login-runtime-prod
+```
+
+Runtime policy:
+
+```text
+deploy/vault/s101-xanhnow-auth-login-runtime-prod.hcl
 ```
 
 Required runtime secrets:
@@ -150,22 +96,111 @@ kv/xanhnow/s101/auth-login/redis
 kv/xanhnow/s101/auth-login/password-hashing
 ```
 
-Migration AppRole: `auth-login-migrator`
+Migration AppRole:
+
+```text
+s101-xanhnow-auth-login-migrator-prod
+```
+
+Migration policy:
+
+```text
+deploy/vault/s101-xanhnow-auth-login-migrator-prod.hcl
+```
+
+Required migration secret:
 
 ```text
 kv/xanhnow/s101/auth-login/postgres/migration
 ```
 
+## PostgreSQL roles
+
+Auth Login owns its own PostgreSQL identities even when sharing database `authtest`.
+
+```text
+xanhnow_auth_migrator
+xanhnow_auth
+```
+
+Use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\BackEndXanhNow\XanhnowAuth\Auth_Login_App\deploy\postgresql\provision-auth-login-postgres.ps1
+```
+
+The API runtime must not run migrations. Run migrations separately with the migrator identity:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\BackEndXanhNow\XanhnowAuth\Auth_Login_App\deploy\postgresql\apply-auth-login-migration.ps1
+```
+
+## Deploy
+
+Build and deploy on an API node:
+
+```bash
+cd /srv/xanhnow/src/Auth_Login_App
+git fetch origin
+git reset --hard origin/main
+release_dir=/tmp/auth-login-$(git rev-parse --short HEAD)-$(date -u +%Y%m%d%H%M%S)
+rm -rf "$release_dir"
+mkdir -p "$release_dir/publish/api"
+/home/xanhnow/.dotnet-10.0.400/dotnet publish src/XanhNow.Auth.Login.Api/XanhNow.Auth.Login.Api.csproj -c Release -o "$release_dir/publish/api"
+printf '{"app":"Auth_Login_App","commit":"%s"}\n' "$(git rev-parse HEAD)" > "$release_dir/release.json"
+sudo cp deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service /etc/systemd/system/xanhnow-auth-login.service
+sudo bash deploy/xanhnow-auth-login/deploy-api-node.sh "$release_dir"
+bash deploy/xanhnow-auth-login/healthcheck.sh
+```
+
+Rollback:
+
+```bash
+sudo bash deploy/xanhnow-auth-login/rollback-api-node.sh
+```
+
+## Endpoints
+
+Health:
+
+```text
+GET /health/live
+GET /health/ready
+GET /api/health/live
+GET /api/health/ready
+GET /api/edge-probe
+```
+
+Security-internal account lookup:
+
+```text
+GET /internal/v1/accounts/{userId}/status
+GET /internal/v1/accounts/by-phone/status?phoneNumber=...
+POST /internal/v1/accounts/{userId}/state
+```
+
+Auth API endpoints remain app-local and are intended to be called through Security/Gateway:
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+GET  /api/auth/session
+```
+
 ## Deploy-ready gate
 
-Login is deploy-ready when all are true:
+Login is production-ready when all are true:
 
 ```text
 dotnet build -c Release: pass
 dotnet test -c Release: pass
+Vault runtime AppRole can read s101 runtime secrets
+Vault migrator AppRole can read s101 migration secret
+PostgreSQL runtime/migrator roles verified
 migrator privilege verification: pass
-/api/health/ready through Edge VIP: HTTP 200
-/api/edge-probe through Edge VIP: HTTP 200
-register/login/logout/session smoke through Edge VIP: pass
-Kafka outbox emits UserRegistered/UserLoggedIn/UserLoggedOut in Real mode
+/health/ready on every API node: HTTP 200
+/api/edge-probe on every API node: HTTP 200
+Security -> Auth Login internal lookup: HTTP 200 for an existing user
+Admin -> Security -> Auth Login recovery lookup: HTTP 200 for an existing user
 ```

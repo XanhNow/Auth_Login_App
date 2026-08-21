@@ -4,9 +4,10 @@ No real values belong in this repository.
 
 ## `kv/xanhnow/s101/auth-login/postgres/runtime`
 
-Preferred field:
+Accepted formats:
 
 - `connection_string`
+- or split fields: `host`, `port`, `database`, `username`, `password`, optional `ssl_mode`
 
 Expected runtime endpoint: `192.168.2.80:5432` through PgBouncer transaction pooling.
 

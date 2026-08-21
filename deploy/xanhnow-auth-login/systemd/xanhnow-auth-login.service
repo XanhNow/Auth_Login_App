@@ -1,0 +1,27 @@
+[Unit]
+Description=XanhNow Auth Login API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xanhnow
+Group=xanhnow
+WorkingDirectory=/srv/xanhnow/apps/auth-login/current
+ExecStart=/usr/bin/dotnet /srv/xanhnow/apps/auth-login/current/XanhNow.Auth.Login.Api.dll
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=xanhnow-auth-login
+Environment=DOTNET_ENVIRONMENT=Production
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://0.0.0.0:8080
+Environment=Infrastructure__Mode=RedisVault
+Environment=Vault__BasePath=xanhnow/s101/auth-login
+Environment=Vault__RoleIdFile=/etc/xanhnow/s101/auth-login/vault/role_id
+Environment=Vault__SecretIdFile=/etc/xanhnow/s101/auth-login/vault/secret_id
+Environment=Vault__CaCertFile=/etc/xanhnow/s101/auth-login/trust/vault-ca.crt
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

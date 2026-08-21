@@ -1,42 +1,27 @@
-﻿# Auth Login Checkpoint
+# Auth Login Checkpoint
 
-Date: 2026-07-10 23:11:32 +07:00
+Date: 2026-08-21
 
 ## Current State
 
-- Independent root: `C:\XanhnowAuth\Auth_Login_App`
-- App Login solution: `XanhNow.Auth.Login.slnx`
+- Independent app root: `C:\BackEndXanhNow\XanhnowAuth\Auth_Login_App`
+- Solution: `XanhNow.Auth.Login.slnx`
 - API project: `src\XanhNow.Auth.Login.Api`
 - Migrator project: `src\XanhNow.Auth.Login.Migrator`
-- Current verified API URL: `http://localhost:5097`
-- App Login is an independent service. Treat its database boundary as independent even if the lab currently shares physical PostgreSQL database `authtest`.
-- PostgreSQL, Redis, Kafka, and password hashing secrets are managed through Vault for runtime.
-- API runtime must not run database migration.
-- Migration must run through migrator/admin identity only.
+- Production service name: `xanhnow-auth-login`
+- Production API node layout: `/srv/xanhnow/apps/auth-login`
+- Runtime port: `8080`
+- Auth Login is a Security child app. External clients must go through Gateway and Security.
 
-## Completed Architecture
+## Architecture Boundary
 
-- Clean Architecture projects:
-  - `XanhNow.Auth.Login.Domain`
-  - `XanhNow.Auth.Login.Application`
-  - `XanhNow.Auth.Login.Infrastructure`
-  - `XanhNow.Auth.Login.Api`
-  - `XanhNow.Auth.Login.Migrator`
-  - `XanhNow.Auth.Login.Application.Tests`
-- Production source no longer uses in-memory infrastructure adapters.
-- Infrastructure modes support real dependencies, including Vault-backed runtime configuration.
-- API endpoints implemented:
-  - `POST /api/auth/register`
-  - `POST /api/auth/login`
-  - `POST /api/auth/logout`
-  - `GET /api/auth/session`
-  - `GET /health/live`
-  - `GET /health/ready`
-- Clean JSON exception handler implemented, no stack trace leakage.
-- Real readiness health check implemented for PostgreSQL, Redis, and Kafka based on infrastructure mode.
-- Swagger/OpenAPI implemented in Development:
-  - `/swagger`
-  - `/swagger/v1/swagger.json`
+Production request flow:
+
+```text
+Client -> Gateway -> Security -> Auth Login
+```
+
+No app outside Security should call Auth Login directly.
 
 ## PostgreSQL
 
@@ -44,197 +29,133 @@ Date: 2026-07-10 23:11:32 +07:00
 - Schema: `auth`
 - Runtime user: `xanhnow_auth`
 - Migration user: `xanhnow_auth_migrator`
-- Admin endpoint for migration: `192.168.2.80:15432`
+- Admin/migration endpoint: `192.168.2.80:15432`
 - Runtime endpoint comes from Vault runtime secret.
-- Migration project refuses to run unless connection string targets:
-  - Username: `xanhnow_auth_migrator`
-  - Host: `192.168.2.80`
-  - Port: `15432`
-  - Database: `authtest`
-- Initial migration does not create user or schema because both already exist.
-- SQL Server-style `row_version` compatibility workaround was removed.
-- `RemoveUserRowVersion` migration applied; PostgreSQL schema no longer depends on SQL Server rowversion behavior.
-- Migrator applies runtime grants after migration.
+- API runtime must not run migrations.
+- Migration must run through migrator identity only.
 
-## PostgreSQL Privilege Verification
-
-Status: PASS on 2026-07-10.
-
-Command used successfully:
-
-```powershell
-cd C:\XanhnowAuth\Auth_Login_App
-
-$secure = Read-Host "Paste password xanhnow_auth_migrator" -AsSecureString
-$password = [System.Net.NetworkCredential]::new("", $secure).Password
-
-$env:AUTH_LOGIN_MIGRATION_CONNECTION_STRING="Host=192.168.2.80;Port=15432;Database=authtest;Username=xanhnow_auth_migrator;Password=$password;Pooling=true;Timeout=15;Command Timeout=60"
-
-dotnet run --no-build --project src\XanhNow.Auth.Login.Migrator\XanhNow.Auth.Login.Migrator.csproj -- --verify-privileges
-
-Remove-Variable secure -ErrorAction SilentlyContinue
-Remove-Variable password -ErrorAction SilentlyContinue
-Remove-Item Env:\AUTH_LOGIN_MIGRATION_CONNECTION_STRING -ErrorAction SilentlyContinue
-```
-
-Verified output:
+Deploy scripts:
 
 ```text
-[PASS] runtime role exists and is not elevated
-[PASS] runtime user has USAGE but not CREATE on schema auth
-[PASS] runtime user is not member of migrator role
-[PASS] runtime user has DML and no TRUNCATE/TRIGGER on auth tables
-[PASS] runtime user is not owner of auth tables
-[PASS] no auth sequences found
-PostgreSQL runtime privilege verification passed.
+deploy/postgresql/provision-auth-login-postgres.ps1
+deploy/postgresql/apply-auth-login-migration.ps1
 ```
-
-Conclusion:
-
-- `xanhnow_auth` has only runtime DML permissions needed by Login App.
-- `xanhnow_auth` does not have schema CREATE.
-- `xanhnow_auth` is not a member of `xanhnow_auth_migrator`.
-- `xanhnow_auth` does not own auth tables, so owner-level DDL is not available.
-- `xanhnow_auth` does not have TRUNCATE/TRIGGER.
 
 ## Vault
 
 Runtime AppRole:
 
-- AppRole: `auth-login`
-- Runtime policy: `auth-login-read`
-- Runtime secret paths include PostgreSQL, Redis, Kafka, and password hashing secrets.
+```text
+s101-xanhnow-auth-login-runtime-prod
+```
+
+Runtime policy:
+
+```text
+deploy/vault/s101-xanhnow-auth-login-runtime-prod.hcl
+```
+
+Runtime secret paths:
+
+```text
+kv/xanhnow/s101/auth-login/postgres/runtime
+kv/xanhnow/s101/auth-login/redis
+kv/xanhnow/s101/auth-login/password-hashing
+```
 
 Migration AppRole:
 
-- AppRole: `auth-login-migrator`
-- Policy: `auth-login-migration-read`
-- Secret path: `kv/xanhnow/auth-login/postgres/migration`
-- Migration AppRole was verified earlier to read migration secret and be denied runtime secret.
+```text
+s101-xanhnow-auth-login-migrator-prod
+```
 
-Security status:
+Migration policy:
 
-- Previously exposed Vault root token was revoked/deleted by the user.
-- Do not rely on old root token again.
-- If Vault AppRole RoleID/SecretID generation is needed later, use a fresh admin token or a dedicated admin workflow.
-- The 5 unseal keys were not exposed in this chat based on current record; no rekey required unless they were exposed elsewhere.
+```text
+deploy/vault/s101-xanhnow-auth-login-migrator-prod.hcl
+```
+
+Migration secret path:
+
+```text
+kv/xanhnow/s101/auth-login/postgres/migration
+```
+
+Vault provisioning scripts:
+
+```text
+deploy/vault/provision-auth-login-vault.ps1
+deploy/vault/write-auth-login-postgres-secrets.ps1
+```
+
+## Runtime Files On API Nodes
+
+```text
+/etc/xanhnow/s101/auth-login/vault/role_id
+/etc/xanhnow/s101/auth-login/vault/secret_id
+/etc/xanhnow/s101/auth-login/trust/vault-ca.crt
+```
+
+Migration AppRole files, if running migrator on Linux:
+
+```text
+/etc/xanhnow/s101/auth-login/migrator/role_id
+/etc/xanhnow/s101/auth-login/migrator/secret_id
+```
 
 ## Redis
 
 - Redis is real, not in-memory.
-- Runtime Redis connection is read from Vault.
+- Runtime Redis secret is read from Vault at `kv/xanhnow/s101/auth-login/redis`.
 - Login creates real Redis session.
 - Logout invalidates real Redis session.
 
 ## Kafka
 
-- Legacy note: Kafka/outbox publishing has been removed from Auth Login runtime.
+- Kafka/outbox publishing is not part of Auth Login runtime.
 - Auth Login no longer requires a Kafka Vault secret.
 - Official cross-app events must be published by XanhNow.Security, not by this child app.
+- Existing historical `auth.outbox_events` schema is not dropped in this step because dropping tables is a separate DB migration decision.
 
-## Verification Commands Passed
-
-```powershell
-dotnet build C:\XanhnowAuth\Auth_Login_App\XanhNow.Auth.Login.slnx --no-restore
-dotnet test C:\XanhnowAuth\Auth_Login_App\XanhNow.Auth.Login.slnx --no-restore
-```
-
-Latest known result:
-
-- Build: passed, 0 warnings, 0 errors.
-- Tests: passed, 3/3.
-
-## How To Run API With Runtime Vault AppRole
-
-Use a fresh runtime SecretID each time if current one has expired:
-
-```powershell
-cd C:\XanhnowAuth\Auth_Login_App
-$env:VAULT_ADDR="https://192.168.2.81:8200"
-
-$runtimeRoleId = vault read -field=role_id auth/approle/role/auth-login/role-id
-$runtimeSecretId = vault write -field=secret_id -f auth/approle/role/auth-login/secret-id
-
-$env:VAULT_ROLE_ID = $runtimeRoleId
-$env:VAULT_SECRET_ID = $runtimeSecretId
-$env:Infrastructure__Mode = "Real"
-
-dotnet run --no-build --project src\XanhNow.Auth.Login.Api\XanhNow.Auth.Login.Api.csproj --urls http://localhost:5097
-```
-
-If only PostgreSQL + Redis testing is needed, use:
-
-```powershell
-$env:Infrastructure__Mode = "RedisVault"
-```
-
-## Next Suggested Work
-
-1. Add structured logging/correlation polish if needed.
-2. Add API contract examples to Swagger.
-3. Add more application tests around invalid login, logout, session lookup, and Kafka outbox retry behavior.
-4. Decide whether to create a dedicated non-root Vault admin workflow for generating AppRole SecretIDs.
-5. Rotate any remaining temporary test AppRole SecretIDs after active testing.
-
-## Deployment Readiness Update - 2026-07-14
-
-Status: READY FOR CONTROLLED DEPLOYMENT SMOKE, not yet fully accepted in production until API pool deployment and Edge smoke pass.
-
-Completed for Edge/internal deployment:
-
-- API now supports Edge-facing health routes:
-  - `GET /api/health/live`
-  - `GET /api/health/ready`
-  - Existing `/health/live` and `/health/ready` remain available.
-- API now exposes Edge probe route:
-  - `GET /api/edge-probe`
-  - Response includes service name, node name, release, and source SHA when `release.json` is present.
-  - Response headers include `X-XanhNow-Api-Node` and `X-XanhNow-Release`.
-- Forwarded headers are configured for the current Edge gateways only:
-  - `192.168.2.24`
-  - `192.168.2.64`
-- HTTPS redirection is disabled by default for production internal Edge traffic. Enable only by explicitly setting:
-  - `Http__EnableHttpsRedirection=true`
-- Deployment documentation added:
-  - `deploy\DEPLOYMENT_SERVICE_PATHS.md`
-  - `deploy\systemd\xanhnow-auth-login.service`
-  - `deploy\vault\secret-field-contract.md`
-
-Target production flow:
+## Deploy Assets
 
 ```text
-Client/Postman -> Edge VIP 192.168.2.82 -> Nginx /api/ -> API pool 192.168.2.25/.38/.65:8080 -> Auth Login API
+deploy/xanhnow-auth-login/systemd/xanhnow-auth-login.service
+deploy/xanhnow-auth-login/deploy-api-node.sh
+deploy/xanhnow-auth-login/rollback-api-node.sh
+deploy/xanhnow-auth-login/healthcheck.sh
+deploy/xanhnow-auth-login/README.md
 ```
 
-Runtime deploy contract:
+## Verified On 2026-08-21
 
-- Deploy to API nodes: `api-1`, `api-2`, `api-3`.
-- Listen internally on HTTP only: `http://0.0.0.0:8080`.
-- Use runtime AppRole only:
-  - `VAULT_ROLE_ID=<auth-login role id>`
-  - `VAULT_SECRET_ID=<fresh auth-login secret id>`
-  - `Infrastructure__Mode=Real`
-  - `Vault__Address=https://192.168.2.81:8200`
-  - `Http__EnableHttpsRedirection=false`
-- Keep migration separate from API runtime.
+Local verification:
 
-Verification on 2026-07-14:
-
-```powershell
-dotnet build XanhNow.Auth.Login.slnx -c Release --no-restore
-dotnet test XanhNow.Auth.Login.slnx -c Release --no-build --no-restore
+```text
+dotnet build XanhNow.Auth.Login.slnx -c Release: PASS
+dotnet test XanhNow.Auth.Login.slnx -c Release --no-build: PASS, 3/3
 ```
 
-Result:
+api-1 verification before adding final deploy assets:
 
-- Build: PASS, 0 warnings, 0 errors.
-- Tests: PASS, 3/3.
+```text
+xanhnow-auth-login active
+GET 127.0.0.1:8080/internal/v1/accounts/by-phone/status?phoneNumber=%2B84979382975 -> 200
+Security -> Auth Login recovery lookup -> 200
+Admin -> Security -> Auth Login recovery lookup -> 200
+```
 
-Remaining before declaring production accepted:
+## Production Acceptance Gate
 
-1. Publish release artifact and copy it to API pool nodes.
-2. Create fresh `auth-login` AppRole SecretID for runtime.
-3. Install/enable user systemd service on each API node.
-4. Smoke each API node directly on `:8080`.
-5. Smoke through Edge VIP `192.168.2.82` for register/login/logout/session and `/api/edge-probe`.
-6. Confirm PostgreSQL, Redis session, and Kafka outbox events are all real and healthy after deployment.
+Login is production-ready when all are true:
+
+```text
+Vault runtime AppRole can read s101 runtime secrets
+Vault migrator AppRole can read s101 migration secret
+PostgreSQL runtime/migrator roles verified
+migrator privilege verification: pass
+/health/ready on every API node: HTTP 200
+/api/edge-probe on every API node: HTTP 200
+Security -> Auth Login internal lookup: HTTP 200 for an existing user
+Admin -> Security -> Auth Login recovery lookup: HTTP 200 for an existing user
+```

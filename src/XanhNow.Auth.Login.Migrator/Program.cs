@@ -308,7 +308,7 @@ static async Task<string?> ReadMigrationConnectionStringFromVaultAsync(IConfigur
 
     var vaultAddress = configuration["MigrationVault:Address"] ?? "https://192.168.2.81:8200";
     var mountPath = configuration["MigrationVault:MountPath"] ?? "kv";
-    var secretPath = configuration["MigrationVault:SecretPath"] ?? "xanhnow/auth-login/postgres/migration";
+    var secretPath = configuration["MigrationVault:SecretPath"] ?? "xanhnow/s101/auth-login/postgres/migration";
 
     using var httpClient = CreateVaultHttpClient(vaultAddress, configuration["MigrationVault:CaCertFile"] ?? configuration["MigrationVault:CaCertificatePath"]);
     using var loginResponse = await httpClient.PostAsJsonAsync("/v1/auth/approle/login", new
