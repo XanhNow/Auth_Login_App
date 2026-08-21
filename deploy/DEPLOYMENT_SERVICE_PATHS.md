@@ -79,7 +79,7 @@ Optional if the appsettings defaults remain valid:
 
 ```text
 Vault__MountPath=kv
-Vault__BasePath=xanhnow/auth-login
+Vault__BasePath=xanhnow/s101/auth-login
 ```
 
 ## Edge-facing endpoints
@@ -139,22 +139,21 @@ Runtime AppRole: `auth-login`
 Expected KV root:
 
 ```text
-kv/xanhnow/auth-login
+kv/xanhnow/s101/auth-login
 ```
 
 Required runtime secrets:
 
 ```text
-kv/xanhnow/auth-login/postgres/runtime
-kv/xanhnow/auth-login/redis
-kv/xanhnow/auth-login/kafka
-kv/xanhnow/auth-login/password-hashing
+kv/xanhnow/s101/auth-login/postgres/runtime
+kv/xanhnow/s101/auth-login/redis
+kv/xanhnow/s101/auth-login/password-hashing
 ```
 
 Migration AppRole: `auth-login-migrator`
 
 ```text
-kv/xanhnow/auth-login/postgres/migration
+kv/xanhnow/s101/auth-login/postgres/migration
 ```
 
 ## Deploy-ready gate

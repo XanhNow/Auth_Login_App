@@ -25,8 +25,8 @@ public sealed class AuthLoginUseCaseTests
     public async Task RegisterAndLogin_ReturnsSessionOnly()
     {
         var deps = CreateDependencies();
-        var register = new RegisterUserHandler(deps.Users, deps.Hasher, deps.Vault, deps.Audit, deps.Outbox, deps.UnitOfWork, deps.Clock);
-        var login = new LoginUserHandler(deps.Users, deps.Sessions, deps.Hasher, deps.Vault, deps.RateLimit, deps.Audit, deps.Outbox, deps.UnitOfWork, deps.Clock);
+        var register = new RegisterUserHandler(deps.Users, deps.Hasher, deps.Vault, deps.Audit, deps.UnitOfWork, deps.Clock);
+        var login = new LoginUserHandler(deps.Users, deps.Sessions, deps.Hasher, deps.Vault, deps.RateLimit, deps.Audit, deps.UnitOfWork, deps.Clock);
 
         var registerResult = await register.HandleAsync(
             new RegisterUserCommand("+84988888888", "StrongPass2026!", "req-test-1"),
@@ -60,15 +60,13 @@ public sealed class AuthLoginUseCaseTests
 
     private static TestDependencies CreateDependencies()
     {
-        var auditAndOutbox = new FakeAuditAndOutbox();
         return new TestDependencies(
             new FakeUserRepository(),
             new FakeSessionCache(),
             new Pbkdf2PasswordHasher(),
             new FakeVaultSecretProvider(),
             new FakeRateLimitService(),
-            auditAndOutbox,
-            auditAndOutbox,
+            new FakeAuditLogService(),
             new FakeUnitOfWork(),
             new SystemClock());
     }
@@ -80,7 +78,6 @@ public sealed class AuthLoginUseCaseTests
         IVaultSecretProvider Vault,
         IRateLimitService RateLimit,
         IAuditLogService Audit,
-        IOutboxEventWriter Outbox,
         IUnitOfWork UnitOfWork,
         IClock Clock);
 
@@ -178,11 +175,6 @@ public sealed class AuthLoginUseCaseTests
             return Task.FromResult(new RedisSecret("test", false));
         }
 
-        public Task<KafkaSecret> ReadKafkaSecretAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new KafkaSecret(null, null, null, null));
-        }
-
         public Task<PasswordSecret> ReadPasswordSecretAsync(string? pepperVersion, CancellationToken cancellationToken)
         {
             return Task.FromResult(new PasswordSecret("test-pepper", pepperVersion ?? "test-v1", "PBKDF2-SHA256"));
@@ -207,7 +199,7 @@ public sealed class AuthLoginUseCaseTests
         }
     }
 
-    private sealed class FakeAuditAndOutbox : IAuditLogService, IOutboxEventWriter
+    private sealed class FakeAuditLogService : IAuditLogService
     {
         public Task WriteRegisterSuccessAsync(User user, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task WriteLoginSuccessAsync(User user, string sessionIdHash, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -215,9 +207,6 @@ public sealed class AuthLoginUseCaseTests
         public Task WriteLogoutAsync(UserId? userId, string sessionIdHash, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task WriteSessionInvalidAsync(string sessionIdHash, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task WriteRateLimitedAsync(string phoneNumberMasked, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task WriteUserRegisteredAsync(User user, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task WriteUserLoggedInAsync(User user, string sessionIdHash, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task WriteUserLoggedOutAsync(UserId userId, string sessionIdHash, string correlationId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork

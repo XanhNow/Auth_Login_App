@@ -128,20 +128,9 @@ Security status:
 
 ## Kafka
 
-- Kafka topic: `xanhnow.auth.login.events.v1`
-- Kafka tool on Windows: `C:\Tools\kafkactl\kafkactl.exe`
-- kafkactl config path used: `%APPDATA%\kafkactl\config.yml`
-- Brokers configured:
-  - `192.168.2.14:9092`
-  - `192.168.2.31:9092`
-  - `192.168.2.51:9092`
-- Kafka Vault secret path: `kv/xanhnow/auth-login/kafka`
-- Kafka secret currently represents no-SASL Kafka; `n/a` fields are treated as empty by producer.
-- Outbox dispatcher: `OutboxDispatcherHostedService`
-- Kafka E2E verified by consumer with events:
-  - `UserRegistered`
-  - `UserLoggedIn`
-  - `UserLoggedOut`
+- Legacy note: Kafka/outbox publishing has been removed from Auth Login runtime.
+- Auth Login no longer requires a Kafka Vault secret.
+- Official cross-app events must be published by XanhNow.Security, not by this child app.
 
 ## Verification Commands Passed
 
